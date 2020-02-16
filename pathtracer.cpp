@@ -63,8 +63,8 @@ void PathTracer::toneMap(QRgb *imageData, std::vector<Vector3f> &intensityValues
             int offset = x + (y * m_width);
             Vector3f currentIntensity =intensityValues[offset];
             imageData[offset] = currentIntensity.norm() > 0 ? qRgb(255.0, 255.0, 255.0)
-                                                            : qRgb(0.0f,
-                     255.0f, 0.0f);
+                                                            : qRgb(255.0*currentIntensity[0]
+                                                              , 255.0*currentIntensity[1],255.0*currentIntensity[2]);
         }
     }
 
