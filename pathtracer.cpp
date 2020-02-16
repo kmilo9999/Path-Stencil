@@ -45,11 +45,13 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene)
     Ray ray(r);
     if(scene.getIntersection(ray, &i)) {
           //** Example code for accessing materials provided by a .mtl file **
-//        const Triangle *t = static_cast<const Triangle *>(i.data);//Get the triangle in the mesh that was intersected
-//        const tinyobj::material_t& mat = t->getMaterial();//Get the material of the triangle from the mesh
-//        const tinyobj::real_t *d = mat.diffuse;//Diffuse color as array of floats
+        const Triangle *t = static_cast<const Triangle *>(i.data);//Get the triangle in the mesh that was intersected
+        const tinyobj::material_t& mat = t->getMaterial();//Get the material of the triangle from the mesh
+        const tinyobj::real_t *d = mat.diffuse;//Diffuse color as array of floats
+       // std::cout << d[0] << " " << d[1] << " " << d[2] << std::endl;
 //        const std::string diffuseTex = mat.diffuse_texname;//Diffuse texture name
-        return Vector3f(1, 1, 1);
+        return Vector3f(d[0], d[1], d[2]);
+       // return Vector3f(0, 0, 0);
     } else {
         return Vector3f(0, 0, 0);
     }
@@ -59,7 +61,10 @@ void PathTracer::toneMap(QRgb *imageData, std::vector<Vector3f> &intensityValues
     for(int y = 0; y < m_height; ++y) {
         for(int x = 0; x < m_width; ++x) {
             int offset = x + (y * m_width);
-            imageData[offset] = intensityValues[offset].norm() > 0 ? qRgb(255, 255, 255) : qRgb(40, 40, 40);
+            Vector3f currentIntensity =intensityValues[offset];
+            imageData[offset] = currentIntensity.norm() > 0 ? qRgb(255.0, 255.0, 255.0)
+                                                            : qRgb(0.0f,
+                     255.0f, 0.0f);
         }
     }
 

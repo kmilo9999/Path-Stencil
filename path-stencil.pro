@@ -351,3 +351,49 @@ HEADERS += \
     Eigen/src/SVD/SVDBase.h \
     Eigen/src/SVD/UpperBidiagonalization.h \
     Eigen/src/UmfPackSupport/UmfPackSupport.h
+
+DISTFILES += \
+    example-scenes/CornellBox.xml \
+    example-scenes/ground_truth/diffuse-direct_lighting_only.png \
+    example-scenes/ground_truth/diffuse-full_global.png \
+    example-scenes/ground_truth/glass-full_global.png \
+    example-scenes/ground_truth/mirror-full_global.png \
+    example-scenes/ground_truth/mirror_direct_lighting_only.png \
+    example-scenes/models/ColoredCube/ColoredCube.mtl \
+    example-scenes/models/CornellBox/CornellBox-Empty-CO.mtl \
+    example-scenes/models/CornellBox/CornellBox-Empty-RG.mtl \
+    example-scenes/models/CornellBox/CornellBox-Empty-Squashed.mtl \
+    example-scenes/models/CornellBox/CornellBox-Empty-White.mtl \
+    example-scenes/models/CornellBox/CornellBox-Glossy-Floor.mtl \
+    example-scenes/models/CornellBox/CornellBox-Glossy.mtl \
+    example-scenes/models/CornellBox/CornellBox-Mirror.mtl \
+    example-scenes/models/CornellBox/CornellBox-Original.mtl \
+    example-scenes/models/CornellBox/CornellBox-Sphere.mtl \
+    example-scenes/models/CornellBox/CornellBox-Water.mtl \
+    example-scenes/models/CornellBox/copyright.txt \
+    example-scenes/models/CornellBox/water.mtl \
+    example-scenes/models/Cube.mtl \
+    example-scenes/models/Harley-Davidson/Harley-Davidson.mtl \
+    example-scenes/models/Harley-Davidson/bike_d.tga \
+    example-scenes/models/Harley-Davidson/brake_d.tga \
+    example-scenes/models/Harley-Davidson/license plate_d.tga \
+    example-scenes/models/Harley-Davidson/wheel_d.tga \
+    example-scenes/models/MedievalBoat/.DS_Store \
+    example-scenes/models/MedievalBoat/Medieval Boat texture \
+    example-scenes/models/MedievalBoat/Medieval Boat.c4d \
+    example-scenes/models/MedievalBoat/Medieval Boat.jpg \
+    example-scenes/models/MedievalBoat/MedievalBoat.mtl \
+    example-scenes/models/MedievalBoat/Patt.JPG \
+    example-scenes/models/MedievalBoat/Wood 1.JPG \
+    example-scenes/models/MedievalBoat/Wood 2.JPG \
+    example-scenes/models/Statue/LibertStatue.mtl \
+    example-scenes/models/Statue/LibertStatue2.mtl \
+    example-scenes/models/Statue/Liberty-DecorazioniMarmo-2.bmp \
+    example-scenes/models/Statue/Liberty-GreenBronze-1.bmp \
+    example-scenes/models/Statue/Liberty-MattoniBasamento-1.bmp \
+    example-scenes/models/Statue/Liberty-Pavimentazione-1.bmp \
+    example-scenes/models/Statue/Liberty-PortaBronzo-1.bmp \
+    example-scenes/out.png \
+    example-scenes/scene1.xml \
+    example-scenes/scene2.xml \
+    example-scenes/scene3.xml
