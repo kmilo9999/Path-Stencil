@@ -19,7 +19,13 @@ private:
     void toneMap(QRgb *imageData, std::vector<Eigen::Vector3f> &intensityValues);
 
     Eigen::Vector3f tracePixel(int x, int y, const Scene &scene, const Eigen::Matrix4f &invViewMatrix);
-    Eigen::Vector3f traceRay(const Ray& r, const Scene &scene);
+    Eigen::Vector3f traceRay(const Ray& r, const Scene &scene,Eigen::Vector3f color, int bounce = 0);
+
+    CS123SceneColor lEmmited(const std::vector<CS123SceneLightData>& sceneLights,
+                             const Eigen::Vector3f& hitPos, const Eigen::Vector3f& hitNormal );
+
+    Eigen::Vector3f uniformHemiSphere(float x, float y) ;
+    void createNormalPlane(const Eigen::Vector3f & v1, Eigen::Vector3f & v2,Eigen::Vector3f & v3);
 };
 
 #endif // PATHTRACER_H
