@@ -34,6 +34,8 @@ public:
 
     bool getIntersection(const Ray& ray, IntersectionInfo* I) const;
 
+    const std::vector<Object *>& sceneObjects();
+
 private:
 
     BVH *m_bvh;

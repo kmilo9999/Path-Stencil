@@ -14,6 +14,11 @@ PathTracer::PathTracer(int width, int height)
 {
 }
 
+void PathTracer::lightSources(const Scene &scene)
+{
+
+}
+
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 {
     std::vector<Vector3f> intensityValues(m_width * m_height);
@@ -27,6 +32,7 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
             intensityValues[offset] = Vector3f(0.0,0.0,0.0);
             for (int rays=0; rays<50; ++rays)
             {
+                //intensityValues[offset] += tracePixel(94, 152, scene, invViewMat);
                 intensityValues[offset] += tracePixel(x, y, scene, invViewMat);
             }
             intensityValues[offset] /= 50;
@@ -57,67 +63,66 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
 Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene,Vector3f color, int bounce )
 {
 
-    /*if(bounce > maxbounce)
-    {
-        maxbounce = bounce;
-        std::cout<< "max bounce: " << maxbounce << std::endl;
-    }*/
-    std::mt19937 mersenneTwister;
+
+
     std::default_random_engine generator;
     std::uniform_real_distribution<float> distribution(0,1);
-    //float random = distribution(generator);
-   // std::cout << "traceRay" << std::endl;
-    if(bounce >= 3)
+    float random = distribution(generator);
+
+    if(bounce >= 5)
     {
-        //if( random <= 0.1)
-        //{
-             //std::cout << "RETURNNNNNNNNNNNNNNNNNNN" << std::endl;
+        if( random <= 0.1)
+        {
             return  Vector3f(0, 0, 0);
-        //}
+        }
     }
 
     IntersectionInfo interesction;
     Ray ray(r);
     if(scene.getIntersection(ray, &interesction)) {
 
-
         //** Example code for accessing materials provided by a .mtl file **
         const Triangle *t = static_cast<const Triangle *>(interesction.data);//Get the triangle in the mesh that was intersected
         const tinyobj::material_t& mat = t->getMaterial();//Get the material of the triangle from the mesh
+        const std::vector<CS123SceneLightData> sceneLights = const_cast<Scene&>(scene).getLights();
         const tinyobj::real_t *e = mat.emission;
         Vector3f pvEmission(e[0],e[1],e[2]);
 
         const tinyobj::real_t *d = mat.diffuse;//Diffuse color as array of floats
         Vector3f diffuseV(d[0],d[1],d[2]);
 
-        /*if(pvEmission != Vector3f::Zero())
+        if(pvEmission != Vector3f::Zero())
         {
             std::cout << "EMISEVE" << std::endl;
-        }*/
+        }
         Vector3f L = diffuseV + pvEmission;
         Vector3f px = interesction.hit;
         const Vector3f hitNormal =  t->getNormal(interesction);
 
-        //CS123SceneColor directLight  = lEmmited(sceneLights,hitPoint,hitNormal);
+        CS123SceneColor directLight  = lEmmited(sceneLights,px,hitNormal);
 
         float r1 = distribution(generator);
         float r2 = distribution(generator);
-        Vector3f newDir = uniformHemiSphere(r1, r2);
+        Vector3f sample = uniformHemiSphere(r1, r2);
         Vector3f v1(0.0,0.0,0.0);
         Vector3f v2(0.0,0.0,0.0);
         createNormalPlane(hitNormal,v1,v2);
-        Vector3f wi;
-        wi[0] = Vector3f(v1.x(),  hitNormal.x() ,v2.x() ).dot(newDir);
-        wi[1] = Vector3f(v1.y(), hitNormal.y() ,v2.y()).dot(newDir);
-        wi[2]= Vector3f(v1.z(), hitNormal.z() ,v2.z() ).dot(newDir);
+        Vector3f wi(0.0,0.0,0.0);
+        wi[0] = sample.x() * v2.x() + sample.y() * hitNormal.x() + sample.z() * v1.x();
+        wi[1] = sample.x() * v2.y() + sample.y() * hitNormal.y() + sample.z() * v1.y();
+        wi[2]= sample.x() * v2.z() + sample.y() * hitNormal.z() + sample.z() * v1.z();
         ray.o = px;
         ray.d = wi;
-        float costheta = std::fmaxf(0.0,ray.d.dot(hitNormal));
+        float costheta = ray.d.dot(hitNormal);
         float pdf = 1 / (2 * M_PI);
-        float factor = costheta / (pdf);// * 0.1);
-        Vector3f lr = traceRay(ray,scene,color,bounce+1) ;
-        Vector3f tmp =  lr.array() * (diffuseV.array() / M_PI) *costheta ;
-        L +=  tmp/pdf ;
+        //float factor = costheta / ((pdf) * 0.1);
+        Vector3f lr = traceRay(ray,scene,color,bounce+1) * costheta /pdf * 0.1;
+        Vector3f total = (Vector3f(directLight.x(),directLight.y(),directLight.z())).array()  + lr.array();
+        //Vector3f total =  lr;
+        Vector3f tmp =  total.array() * ((diffuseV).array()/M_PI) ;
+
+        L +=  tmp  ;
+        //L = (Vector3f(directLight.x(),directLight.y(),directLight.z())).array() * (diffuseV).array();
         return L;
        //  return Vector3f(d[0] , d[1], d[2]);
     } else {
@@ -127,9 +132,9 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene,Vector3f color, i
 }
 
 
-void PathTracer::createNormalPlane(const Vector3f & v1, Vector3f & v2,Vector3f & v3)
+void PathTracer::createNormalPlane(const Vector3f & normal, Vector3f & v2,Vector3f & v3)
 {
-    if (std::abs(v1.x()) > std::abs(v1.y())) {
+   /* if (std::abs(v1.x()) > std::abs(v1.y())) {
            // project to the y = 0 plane and construct a normalized orthogonal vector in this plane
            float invLen = 1.f / sqrtf(v1.x() * v1.x() + v1.z() * v1.z());
            v2 = Vector3f(-v1.z() * invLen, 0.0f, v1.x() * invLen);
@@ -138,14 +143,24 @@ void PathTracer::createNormalPlane(const Vector3f & v1, Vector3f & v2,Vector3f &
            float invLen = 1.0f / sqrtf(v1.y() * v1.y() + v1.z() * v1.z());
            v2 = Vector3f(0.0f, v1.z() * invLen, -v1.y() * invLen);
        }
-       v3 = v1.cross(v2);
+       v3 = v1.cross(v2);*/
+
+    if (std::fabs(normal.x()) > std::fabs(normal.y()))
+    {
+        v2 = Vector3f(normal.z(), 0, -normal.x()) / sqrtf(normal.x() * normal.x() + normal.z() * normal.z());
+    }
+    else{
+        v2 = Vector3f(0, -normal.z(), normal.y()) / sqrtf(normal.y() * normal.y() + normal.z() * normal.z());
+
+    }
+    v3 = normal.cross(v2);
 }
 
 Vector3f PathTracer::uniformHemiSphere(float x, float y)
 {
    float r = sqrtf(1.0-x*x);
    float phi = 2*M_PI*y;
-   return Vector3f(cosf(phi) * r,sinf(phi) *r,x);
+   return Vector3f(cosf(phi) * r,x,sinf(phi) *r);
 }
 
 CS123SceneColor PathTracer::lEmmited(const std::vector<CS123SceneLightData>& sceneLights,
