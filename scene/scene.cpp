@@ -256,7 +256,7 @@ bool Scene::getIntersection(const Ray& ray, IntersectionInfo* I) const{
     return getBVH().getIntersection(ray, I, false);
 }
 
-const std::vector<Object *>& Scene::sceneObjects()
+const std::vector<Object *>& Scene::sceneObjects() const
 {
    return *_objects;
 }

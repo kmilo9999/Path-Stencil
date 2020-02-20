@@ -23,6 +23,7 @@ void Mesh::init(const std::vector<Vector3f> &vertices,
     _materials = materials;
     calculateMeshStats();
     createMeshBVH();
+
 }
 
 Mesh::~Mesh()
@@ -128,8 +129,25 @@ void Mesh::createMeshBVH()
         Vector3f n3 = _normals[face[2]];
         _triangles[i] = Triangle(v1, v2, v3, n1, n2, n3, i);
         _triangles[i].setMaterial(getMaterial(i));
+        numTriangles++;
         (*_objects)[i] = &_triangles[i];
     }
 
     _meshBvh = new BVH(_objects);
+}
+
+
+const Triangle* Mesh::triangles() const
+{
+   return _triangles;
+}
+
+size_t Mesh::getNumTriangles()
+{
+   return numTriangles;
+}
+
+size_t Mesh::getNumTriangles() const
+{
+   return numTriangles;
 }

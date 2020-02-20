@@ -13,6 +13,8 @@ public:
              Eigen::Vector3f n1, Eigen::Vector3f n2, Eigen::Vector3f n3,
              int index);
 
+    //Triangle(const Triangle& copy);
+
     virtual bool getIntersection(const Ray &ray, IntersectionInfo *intersection) const;
 
     virtual Eigen::Vector3f getNormal(const IntersectionInfo &I) const;
@@ -26,6 +28,9 @@ public:
 
     tinyobj::material_t getMaterial() const;
     void setMaterial(const tinyobj::material_t &material);
+
+    void getVertices(Eigen::Vector3f& v1, Eigen::Vector3f& v2 , Eigen::Vector3f& v3) const;
+    void getNormals(Eigen::Vector3f& v1, Eigen::Vector3f& v2 , Eigen::Vector3f& v3) const;
 
 private:
     Eigen::Vector3f _v1, _v2, _v3;

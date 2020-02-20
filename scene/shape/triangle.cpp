@@ -107,3 +107,10 @@ void Triangle::setMaterial(const tinyobj::material_t &material)
 {
     m_material = material;
 }
+
+void Triangle::getVertices(Eigen::Vector3f& v1, Eigen::Vector3f& v2 , Eigen::Vector3f& v3) const
+{
+   v1 = _v1;
+   v2 = _v2;
+   v3 = _v3;
+}
