@@ -70,6 +70,8 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 
 Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix)
 {
+
+
     Vector3f p(0, 0, 0);
    // for(int pxs=0;pxs<50;pxs++)
    // {
@@ -77,8 +79,9 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
         std::default_random_engine generator;
         std::uniform_real_distribution<float> distribution;
         Vector3f randomRay(2.0 * distribution(generator) - 1,1 - (2.f * distribution(generator) / m_height),0);
-        Vector3f d((2.f * x / m_width) - 1, 1 - (2.f * y / m_height), -1);
-        //d += randomRay;
+        Vector3f d(((2.f * x / m_width) - 1),
+                   (1 - (2.f * y / m_height)), -1);
+
         d.normalize();
 
         //d is direction
@@ -160,19 +163,18 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
         Vector3f lr = traceRay(ray,scene,bounce+1)  ;
         Vector3f  brdf = diffuseV/M_PI;
 
-        //if(pvEmission != Vector3f::Zero())
-
         Vector3f incoming  =   lr.array() * brdf.array() *  costheta /pdf * 0.1 ;
 
-        //Vector3f total  =  incoming;
+        Vector3f tonedIncomming  =  incoming /  1 +incoming;
 
-        L +=  incoming  ;
+        L +=  tonedIncomming  ;
 
         if(bounce == 0 )
         {
-           L += diffuseV *1/M_PI + pvEmission;
+           Vector3f emission =  pvEmission;
+           Vector3f tonedEmission = emission /  1 + emission ;
+           L +=tonedEmission;
         }
-        //L = (Vector3f(directLight.x(),directLight.y(),directLight.z())).array() * (diffuseV).array();
         return L;
        //  return Vector3f(d[0] , d[1], d[2]);
     } else {
@@ -226,31 +228,31 @@ Vector3f PathTracer::directLight(const std::vector<CS123SceneLightData>& sceneLi
 
       Vector3f v12 = v2-v1;
       Vector3f v13 = v3-v1;
-      float triangleArea = v12.cross(v13).norm()/2;
+      float triangleArea = std::abs(v12.cross(v13).norm())/2;
 
 
       for(size_t j = 0 ; j < vVertices.size();j++)
       {
-
 
           Vector3f lightPosition = vVertices[j];
           Vector3f normalV = t->getNormal(lightPosition);
 
           Vector3f lightDir = (hitPos -lightPosition).normalized() ;
 
-          float costheta = hitNormal.dot(lightDir);
-          float costhetaPrime = normalV.dot(-lightDir);
+          float costheta = std::fmax(0.0,hitNormal.dot(-lightDir));
+          float costhetaPrime = std::fmax(0.0,normalV.dot(lightDir));
 
           float lenght = lightDir.norm();
           float lenght2 = lenght * lenght;
 
 
-          Vector3f light = lightColor * 1/M_PI *costheta*costhetaPrime* (1 / lenght2) * triangleArea;
+          Vector3f light = (hitColor.array() * lightColor.array()) * (1/M_PI) *costheta*costhetaPrime* (1 / lenght2) * triangleArea;
+          light = light /  1 + light;
 
 
           directLight+= light;
       }
-        //directLight = directLight / triangleArea;
+        directLight = directLight / 3 ;
     }
 
     return directLight ;

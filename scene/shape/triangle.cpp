@@ -114,3 +114,11 @@ void Triangle::getVertices(Eigen::Vector3f& v1, Eigen::Vector3f& v2 , Eigen::Vec
    v2 = _v2;
    v3 = _v3;
 }
+
+void Triangle::getNormals(Eigen::Vector3f& v1, Eigen::Vector3f& v2 , Eigen::Vector3f& v3) const
+{
+    v1 = _n1;
+    v2 = _n2;
+    v3 = _n3;
+}
+
