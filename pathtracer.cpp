@@ -56,7 +56,7 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
            // intensityValues[offset] = tracePixel(x, y, scene, invViewMat);
 
             intensityValues[offset] = Vector3f(0.0,0.0,0.0);
-            for (int rays=0; rays<50; ++rays)
+            for (int rays=0; rays<100; ++rays)
             {
                 //intensityValues[offset] += tracePixel(115, 49, scene, invViewMat);
                 intensityValues[offset] += tracePixel(x, y, scene, invViewMat);
@@ -131,15 +131,11 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
         const tinyobj::real_t *d = mat.diffuse;//Diffuse color as array of floats
         Vector3f diffuseV(d[0],d[1],d[2]);
 
-
-
         Vector3f px = interesction.hit;
         const Vector3f hitNormal =  t->getNormal(interesction);
 
-        Vector3f vdirectLight;
-        //if(pvEmission != Vector3f::Zero())
         Vector3f L = Vector3f::Zero();
-        Vector3f dL  = directLight(sceneLights,px,hitNormal,diffuseV);
+        Vector3f dL  = directLight(scene,px,hitNormal,diffuseV);
          //Vector3f L  = diffuseV + pvEmission;
 
 
@@ -160,10 +156,10 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
 
 
 
-        Vector3f lr = traceRay(ray,scene,bounce+1)  ;
-        Vector3f  brdf = diffuseV/M_PI;
+        //Vector3f lr = traceRay(ray,scene,bounce+1)  ;
+        //Vector3f  brdf = diffuseV/M_PI;
 
-        Vector3f incoming  =   (lr.array()   * brdf.array()) * costheta / (pdf * 0.1) ;
+        //Vector3f incoming  =   (lr.array()   * brdf.array()) * costheta / (pdf * 0.1) ;
 
         //L =  incoming  ;
         //L = dL + incoming;
@@ -171,8 +167,6 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
         if(bounce == 0 )
         {
            L +=  (pvEmission);
-
-          //     L += emission ;
         }
         return L;
 
@@ -203,7 +197,7 @@ Vector3f PathTracer::uniformHemiSphere(float x, float y)
    return Vector3f(cosf(phi) * r,x,sinf(phi) *r);
 }
 
-Vector3f PathTracer::directLight(const std::vector<CS123SceneLightData>& sceneLights,
+Vector3f PathTracer::directLight(const Scene& scene,
                          const Vector3f& hitPos, const Vector3f& hitNormal, Vector3f hitColor )
 {
 
@@ -246,10 +240,23 @@ Vector3f PathTracer::directLight(const std::vector<CS123SceneLightData>& sceneLi
       {
 
           Vector3f lightPosition = vVertices[j];
+
           //Vector3f normalV = t->getNormal(lightPosition);
           Vector3f normalV =vNormals[j];
 
+
           Vector3f lightDir = (hitPos -lightPosition).normalized() ;
+
+          int visibility = 0;
+
+          Ray r(hitPos, lightDir);
+          IntersectionInfo interesction;
+          if(scene.getIntersection(r, &interesction))
+          {
+            visibility = 1 ;
+          }
+
+
           Vector3f lightDirPrime = (lightPosition - hitPos).normalized() ;
 
           float costheta = std::fmax(0.0,hitNormal.dot(lightDirPrime));
@@ -259,12 +266,12 @@ Vector3f PathTracer::directLight(const std::vector<CS123SceneLightData>& sceneLi
           float lenght2 = lenght * lenght;
 
 
-          Vector3f light = ( lightColor ) * 1/M_PI
+          Vector3f light = ( lightColor ) * (1/M_PI) * visibility
                   * costheta*costhetaPrime* (1 / lenght2) * triangleArea  ;
          // light = light /  1 + light;
 
 
-          accum = (hitColor.array() * light.array()) ;
+          accum = (hitColor.array() * light.array()  ) ;
       }
          //Vector3f s =  accum.array() ;
          directLight += accum;
