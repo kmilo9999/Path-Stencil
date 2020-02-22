@@ -56,12 +56,12 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
            // intensityValues[offset] = tracePixel(x, y, scene, invViewMat);
 
             intensityValues[offset] = Vector3f(0.0,0.0,0.0);
-            for (int rays=0; rays<100; ++rays)
+            for (int rays=0; rays<10; ++rays)
             {
                 //intensityValues[offset] += tracePixel(115, 49, scene, invViewMat);
                 intensityValues[offset] += tracePixel(x, y, scene, invViewMat);
             }
-            intensityValues[offset] /= 50;
+            intensityValues[offset] /= 10;
 
         }
     }
@@ -103,19 +103,15 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
 Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
 {
 
+  //  std::cout << "bounce :" << bounce << std::endl;
+   Vector2f random = (Vector2f::Random () + Vector2f::Ones())/2;
 
 
-    std::default_random_engine generator;
-    std::uniform_real_distribution<float> distribution(0,1);
-    float random = distribution(generator);
-
-    if(bounce >= 5)
-    {
-        if( random <= 0.1)
+        if( random.x() <=  0.1)
         {
             return  Vector3f(0, 0, 0);
         }
-    }
+
 
     IntersectionInfo interesction;
     Ray ray(r);
@@ -132,13 +128,15 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
         Vector3f diffuseV(d[0],d[1],d[2]);
 
         Vector3f px = interesction.hit;
-        const Vector3f hitNormal =  t->getNormal(interesction);
+        Vector3f n1,n2,n3;
 
+        const Vector3f hitNormal =  t->getNormal(px).normalized();
+        t->getNormals(n1,n2,n3);
+        //const Vector3f hitNormal = n1.normalized();
         Vector3f L = Vector3f::Zero();
+
+       // std::cout<<"direct light"<< std::endl;
         Vector3f dL  = directLight(scene,px,hitNormal,diffuseV);
-         //Vector3f L  = diffuseV + pvEmission;
-
-
 
         Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2;
         Vector3f sample = uniformHemiSphere(myrand.x(), myrand.y());
@@ -146,27 +144,30 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
         Vector3f v2(0.0,0.0,0.0);
         createNormalPlane(hitNormal,v1,v2);
         Vector3f wi(0.0,0.0,0.0);
-        wi[0] = sample.x() * v2.x() + sample.y() * hitNormal.x() + sample.z() * v1.x();
-        wi[1] = sample.x() * v2.y() + sample.y() * hitNormal.y() + sample.z() * v1.y();
-        wi[2]= sample.x() * v2.z() + sample.y() * hitNormal.z() + sample.z() * v1.z();
+        //wi[0] = sample.x() * v2.x() + sample.y() * hitNormal.x() + sample.z() * v1.x();
+        //wi[1] = sample.x() * v2.y() + sample.y() * hitNormal.y() + sample.z() * v1.y();
+        //wi[2]= sample.x() * v2.z() + sample.y() * hitNormal.z() + sample.z() * v1.z();
+        wi[0] = Vector3f(v1.x(), v2.x(), hitNormal.x()).dot(sample);
+        wi[1] = Vector3f(v1.y(), v2.y(), hitNormal.y()).dot(sample);
+        wi[2] = Vector3f(v1.z(), v2.z(), hitNormal.z()).dot(sample);
         ray.o = px;
         ray.d = wi;
-        float costheta = std::fmax(0.0,ray.d.dot(hitNormal));
+        float costheta = wi.dot(hitNormal);
         float pdf = 1 / (2 * M_PI);
 
 
 
-        //Vector3f lr = traceRay(ray,scene,bounce+1)  ;
-        //Vector3f  brdf = diffuseV/M_PI;
+       Vector3f lr = traceRay(ray,scene,bounce+1)  ;
+      Vector3f  brdf = diffuseV/M_PI;
+      Vector3f c = (lr.array()   * brdf.array());
+     Vector3f incoming  = c   * costheta / (pdf * 0.9) ;
 
-        //Vector3f incoming  =   (lr.array()   * brdf.array()) * costheta / (pdf * 0.1) ;
-
-        //L =  incoming  ;
-        //L = dL + incoming;
-        L = dL;
+       //L =  incoming  ;
+      L = dL + incoming;
+       // L = dL;
         if(bounce == 0 )
-        {
-           L +=  (pvEmission);
+       {
+           L +=  pvEmission;
         }
         return L;
 
@@ -179,13 +180,23 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
 
 void PathTracer::createNormalPlane(const Vector3f & normal, Vector3f & v2,Vector3f & v3)
 {
-    if (std::fabs(normal.x()) > std::fabs(normal.y()))
+    /*if (std::fabs(normal.x()) > std::fabs(normal.y()))
     {
         v2 = Vector3f(normal.z(), 0, -normal.x()) / sqrtf(normal.x() * normal.x() + normal.z() * normal.z());
     }
     else{
         v2 = Vector3f(0, -normal.z(), normal.y()) / sqrtf(normal.y() * normal.y() + normal.z() * normal.z());
 
+    }*/
+
+   if (std::fabs(normal.x()) > std::fabs(normal.y()))
+    {
+       float invLen = 1.f / sqrtf(normal.x() * normal.x() + normal.z() * normal.z());
+       v2 = Vector3f(-normal.z()* invLen, 0.0f, normal.x() * invLen);
+    }
+    else{
+        float invLen = 1.f / sqrtf(normal.y() * normal.y() + normal.z() * normal.z());
+       v2 = Vector3f(0.0, normal.z() * invLen, -normal.y()*invLen); // sqrtf(normal.y() * normal.y() + normal.z() * normal.z());
     }
     v3 = normal.cross(v2);
 }
@@ -194,7 +205,13 @@ Vector3f PathTracer::uniformHemiSphere(float x, float y)
 {
    float r = sqrtf(1.0-x*x);
    float phi = 2*M_PI*y;
-   return Vector3f(cosf(phi) * r,x,sinf(phi) *r);
+   Vector3f dir(cosf(phi) * r,sinf(phi) *r,x);
+   //return dir.normalized();
+
+   /*float phi = 2 * M_PI * x;
+   float theta  = acosf(1-y);
+   return Vector3f(sinf(phi)* cosf(theta), sinf(phi)*sinf(theta),cosf(phi)).normalized();
+*/
 }
 
 Vector3f PathTracer::directLight(const Scene& scene,
@@ -203,7 +220,9 @@ Vector3f PathTracer::directLight(const Scene& scene,
 
     Vector3f directLight(0.0,0.0,0.0) ;
     //for(size_t i = 0 ; i < sceneLights.size();i++)
-    for(size_t i = 0 ; i < triangleLigthSources.size();i++)
+
+     int randomAreaLigth = rand() % (triangleLigthSources.size() - 0 ) + 0;
+    for(size_t i = 0 ; i < 1;i++)
     {
       const Triangle*  t = triangleLigthSources[i];
 
@@ -216,7 +235,7 @@ Vector3f PathTracer::directLight(const Scene& scene,
       Vector3f n3(0.0,0.0,0.0);
 
       t->getVertices(v1,v2,v3);
-      t->getVertices(n1,n2,n3);
+      t->getNormals(n1,n2,n3);
       std::vector<Vector3f> vVertices;
       std::vector<Vector3f> vNormals;
       vVertices.push_back(v1);
@@ -233,52 +252,76 @@ Vector3f PathTracer::directLight(const Scene& scene,
 
       Vector3f v12 = v2-v1;
       Vector3f v13 = v3-v1;
-      float triangleArea = std::abs(v12.cross(v13).norm())/2;
+    //  std::cout << " v1: " << v1 << " v2: " << v2 << " v3: " << v3 << std::endl;
+     // float triangleArea = (v12.cross(v13)).norm()/2.0;
+      float triangleArea = 0.1786;
 
       Vector3f accum(0.0,0.0,0.0);
-      for(size_t j = 0 ; j < 1;j++)
+      int randomPointLigth = rand() % (2-0 + 1) + 0;
+
+     for(size_t j = 0 ; j < 1;j++)
+      // for(size_t j = 0 ; j < 1;j++)
       {
+          Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2;
+          float r1 = myrand.x();
+          float r2 = myrand.y();
+          if(r1 +r2 >= 1)
+          {
+            r1 = 1- r1;
+            r2 = 1- r2;
+          }
+         //Vector3f lightPosition = vVertices[2];
+           Vector3f lightPosition = v1 + r1*(v12) + r2*(v13);
 
-          Vector3f lightPosition = vVertices[j];
-
-          //Vector3f normalV = t->getNormal(lightPosition);
-          Vector3f normalV =vNormals[j];
+          Vector3f normalV = t->getNormal(lightPosition);
+          //Vector3f normalV =vNormals[2];
 
 
           Vector3f lightDir = (hitPos -lightPosition).normalized() ;
 
           int visibility = 0;
-
-          Ray r(hitPos, lightDir);
+          Vector3f vs (0.0,0.0,0.0);
+          Ray r(hitPos, -lightDir);
           IntersectionInfo interesction;
           if(scene.getIntersection(r, &interesction))
           {
             visibility = 1 ;
+            float dis = (hitPos -lightPosition).norm();
+            Vector3f lightDir = (hitPos -lightPosition).normalized() ;
+            Vector3f lightDirPrime = (lightPosition - hitPos).normalized() ;
+            float costheta = std::fmax(0.0,hitNormal.dot(lightDirPrime));
+            float costhetaPrime = std::fmax(0.0,normalV.dot(lightDir));
+
+            Vector3f light = ( (lightColor.array() * hitColor.array()) * 1/M_PI  ) * visibility
+                    * costheta*costhetaPrime* (1 / (dis * dis)) * triangleArea  ;
+
+
+            vs = lightColor.array() * hitColor.array() *  1.0/M_PI  *
+                    costheta * costhetaPrime/(dis * dis)* triangleArea * 10.0 ;
+          //  std::cout << "triangleArea : " << triangleArea << std::endl;
           }
 
 
-          Vector3f lightDirPrime = (lightPosition - hitPos).normalized() ;
-
-          float costheta = std::fmax(0.0,hitNormal.dot(lightDirPrime));
-          float costhetaPrime = std::fmax(0.0,normalV.dot(-lightDir));
-
-          float lenght = (hitPos -lightPosition).norm();
-          float lenght2 = lenght * lenght;
 
 
-          Vector3f light = ( lightColor ) * (1/M_PI) * visibility
-                  * costheta*costhetaPrime* (1 / lenght2) * triangleArea  ;
+          //float lenght = (hitPos -lightPosition).norm();
+          //float lenght2 = lenght * lenght;
+
+
          // light = light /  1 + light;
 
 
-          accum = (hitColor.array() * light.array()  ) ;
+         // accum += light;//(hitColor.array() * 1/M_PI * light.array()  * 10) ;
+          accum = vs;
       }
-         //Vector3f s =  accum.array() ;
+        //accum/=10;
          directLight += accum;
-         //directLight *= 1/3  ;
+
     }
 
-    return directLight/2  ;
+   // return hitColor.array() * 1/M_PI  * (directLight/2).array()   ;
+     return  (directLight/2)  ;
+  //  return directLight;
 
 }
 
