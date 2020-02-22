@@ -206,7 +206,7 @@ Vector3f PathTracer::uniformHemiSphere(float x, float y)
    float r = sqrtf(1.0-x*x);
    float phi = 2*M_PI*y;
    Vector3f dir(cosf(phi) * r,sinf(phi) *r,x);
-   //return dir.normalized();
+   return dir.normalized();
 
    /*float phi = 2 * M_PI * x;
    float theta  = acosf(1-y);
