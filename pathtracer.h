@@ -23,15 +23,15 @@ private:
     Eigen::Vector3f traceRay(const Ray& r, const Scene &scene, int bounce = 0);
 
     Eigen::Vector3f directLight(const Scene& scene,
-                             const Eigen::Vector3f& hitPos, const Eigen::Vector3f& hitNormal,
-                             Eigen::Vector3f hitColor);
+                             const Eigen::Vector3f& hitPos, const Eigen::Vector3f& hitNormal);
 
     Eigen::Vector3f uniformHemiSphere(const Eigen::Vector3f& normal,float x, float y) ;
     void createNormalPlane(const Eigen::Vector3f & v1, Eigen::Vector3f & v2,Eigen::Vector3f & v3);
     std::vector<const Triangle*> triangleLigthSources;
-    Eigen::Vector3f getBRDF(const Eigen::Vector3f& rayDir, const Eigen::Vector3f& normal,
+    Eigen::Vector3f getBRDF(const Eigen::Vector3f& nRayDir,Eigen::Vector3f& oldRayDir, const Eigen::Vector3f& normal,
                             const tinyobj::material_t& mat);
 
+     float emmisionMultiplier;
 };
 
 #endif // PATHTRACER_H

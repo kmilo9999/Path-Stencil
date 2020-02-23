@@ -10,7 +10,7 @@
 using namespace Eigen;
 
 PathTracer::PathTracer(int width, int height)
-    : m_width(width), m_height(height)
+    : m_width(width), m_height(height), emmisionMultiplier( 5.0)
 {
 }
 
@@ -99,7 +99,8 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
 
 }
 
-Eigen::Vector3f PathTracer::getBRDF(const Vector3f& rayDir, const Vector3f& normal,const tinyobj::material_t& mat)
+Eigen::Vector3f PathTracer::getBRDF(const Vector3f& rayDir,  Vector3f& oldRayDir,
+                                    const Vector3f& normal,const tinyobj::material_t& mat)
 {
 
     const tinyobj::real_t *d = mat.diffuse;//Diffuse color as array of floats
@@ -108,12 +109,12 @@ Eigen::Vector3f PathTracer::getBRDF(const Vector3f& rayDir, const Vector3f& norm
     const tinyobj::real_t *s = mat.specular;//specular color as array of floats
     Vector3f specularV(s[0],s[1],s[2]);
 
-    const tinyobj::real_t shininnes = mat.shininess;
+    const tinyobj::real_t shininnes = 100;//mat.shininess;
 
    if(specularV !=  Vector3f::Zero())
    {
        Vector3f reflectV = rayDir - 2.0 * (rayDir.dot(normal)) * normal;
-       float reflectShininnes = pow(reflectV.dot(rayDir), shininnes);
+       float reflectShininnes = pow(reflectV.dot(oldRayDir), shininnes);
        return specularV * ((shininnes + 2) / (2 * M_PI)) * reflectShininnes;
    }
    else
@@ -128,10 +129,6 @@ Eigen::Vector3f PathTracer::getBRDF(const Vector3f& rayDir, const Vector3f& norm
 Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
 {
 
-  //  std::cout << "bounce :" << bounce << std::endl;
-
-
-
     IntersectionInfo interesction;
     Ray ray(r);
     if(scene.getIntersection(ray, &interesction)) {
@@ -144,42 +141,63 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
         Vector3f pvEmission(e[0],e[1],e[2]);
 
         const tinyobj::real_t *d = mat.diffuse;//Diffuse color as array of floats
+
+        bool isMirror = false;
+        bool refrct = false;
+        if (mat.illum == 5)
+        {
+             isMirror = true;
+        }
+        else if (mat.illum == 7)
+        {
+             refrct = true;
+        }
+
         Vector3f diffuseV(d[0],d[1],d[2]);
 
         Vector3f px = interesction.hit;
 
-
-        const Vector3f hitNormal =  t->getNormal(px);
+        Vector3f currentDir = ray.d;
+        const Vector3f hitNormal =  t->getNormal(px).normalized();
 
         Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2.0;
 
         // hemi sphere sampling
         Vector3f newDir = uniformHemiSphere(hitNormal,myrand.x(),myrand.y());
 
-        Vector3f brdf = getBRDF(newDir,hitNormal,mat);
-        //Vector3f brdf = diffuseV/M_PI;
+        Vector3f brdf = getBRDF(newDir, currentDir,hitNormal,mat);
 
-        Vector3f L  = directLight(scene,px,hitNormal,diffuseV).array() * brdf.array();
+        Vector3f L  = directLight(scene,px,hitNormal).array() * brdf.array();
 
         Vector2f random = (Vector2f::Random () + Vector2f::Ones())/2.0;
 
-        float pdf_rr =0.5;
+        float pdf_rr =0.75;
         if(random.x() < pdf_rr)
         {
+            /*if (isMirror)
+            {
+              Vector3f reflectVector = currentDir - 2.0 * (currentDir.dot(hitNormal)) * hitNormal;
+              Vector3f lr = traceRay(Ray(px, reflectVector), scene, 0);
+              Vector3f incoming = lr / pdf_rr;
+              L += incoming;
+            }*/
+            //else
+           // {
+               float costheta = newDir.dot(hitNormal);
+               float pdf = 1.0 / (2.0 * M_PI);
 
-            float costheta = newDir.dot(hitNormal);
-            float pdf = 1.0 / (2.0 * M_PI);
+               Vector3f lr = traceRay(Ray(px,newDir),scene,bounce+1)  ;
 
-            Vector3f lr = traceRay(Ray(px,newDir),scene,bounce+1)  ;
+               Vector3f color = (lr.array()   * brdf.array());
+               Vector3f incoming  = color    * costheta/ (pdf * pdf_rr) ;
+               L +=  incoming  ;
+           // }
 
-            Vector3f color = (lr.array()   * brdf.array());
-            Vector3f incoming  = color    * costheta/ (pdf * pdf_rr)  ;
-            L +=  incoming  ;
         }
 
         if(bounce == 0 )
          {
-            L +=  pvEmission *5;
+            L +=  pvEmission *emmisionMultiplier;
          }
         return L;
 
@@ -244,7 +262,7 @@ Vector3f PathTracer::uniformHemiSphere(const Vector3f& normal, float x, float y)
 }
 
 Vector3f PathTracer::directLight(const Scene& scene,
-                         const Vector3f& hitPos, const Vector3f& hitNormal, Vector3f hitColor )
+                         const Vector3f& hitPos, const Vector3f& hitNormal )
 {
 
       Vector3f vdirectLight(0.0,0.0,0.0) ;
@@ -264,7 +282,7 @@ Vector3f PathTracer::directLight(const Scene& scene,
           Vector3f lightDiffuse(t->getMaterial().diffuse[0],t->getMaterial().diffuse[1],t->getMaterial().diffuse[2]);
 
 
-          lightColor *=5;
+          lightColor *= emmisionMultiplier;
 
           Vector3f v12 = v2-v1;
           Vector3f v13 = v3-v1;
@@ -273,27 +291,21 @@ Vector3f PathTracer::directLight(const Scene& scene,
 
           Vector3f accum(0.0,0.0,0.0);
 
-          int samples = 5;
+          int samples = 1;
           for(int j = 0 ; j < samples; j++)
           {
                Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2;
                float r1 = myrand.x();
                float r2 = myrand.y();
-               /*if(r1 +r2 >= 1)
-               {
-                 r1 = 1- r1;
-                 r2 = 1- r2;
-               }*/
 
-               // Vector3f lightPosition = v1 + r1*(v12) + r2*(v13);
                Vector3f lightPosition = (1 - sqrt(r1)) * v1
                                          + (sqrt(r1) * (1 - r2)) * v2
                                          + (r2 * sqrt(r1)) * v3;
 
                Vector3f normalV = t->getNormal(lightPosition).normalized();
 
-               Vector3f lightDir = (hitPos -lightPosition) ;
-               Vector3f lightDirPrime = (lightPosition - hitPos);
+               Vector3f lightDir = (hitPos -lightPosition).normalized() ;
+               Vector3f lightDirPrime = (lightPosition - hitPos).normalized();
 
                Ray r(hitPos, lightDirPrime);
                IntersectionInfo interesction;
@@ -303,8 +315,8 @@ Vector3f PathTracer::directLight(const Scene& scene,
 
                  float dis = (hitPos -lightPosition).norm();
 
-                 float costheta = std::fmax(0.0,lightDirPrime.dot(hitNormal)/lightDirPrime.norm());
-                 float costhetaPrime = std::fmax(0.0,lightDir.dot(normalV)/lightDirPrime.norm());
+                 float costheta = std::fmax(0.0,lightDirPrime.dot(hitNormal));
+                 float costhetaPrime = std::fmax(0.0,lightDir.dot(normalV));
 
 
                  Vector3f vs = lightColor * costheta * costhetaPrime/(dis * dis)  ;
@@ -330,12 +342,6 @@ void PathTracer::toneMap(QRgb *imageData, std::vector<Vector3f> &intensityValues
             int offset = x + (y * m_width);
             Vector3f currentIntensity = intensityValues[offset];
 
-            /*imageData[offset] = currentIntensity.norm() > 0 ? qRgb(255.0, 255.0, 255.0)
-                                                            : qRgb(255.0, 40.0, 40.0 );*/
-            /*imageData[offset] = qRgb(currentIntensity[0] *255.0,
-                                     currentIntensity[1]*255.0,
-                                     currentIntensity[2]*255.0);*/
-            //Vector3f tonedColor = currentIntensity.array() / (Vector3f(1,1,1) + currentIntensity).array();
             float r = intensityValues[offset].x() / (1.0 + intensityValues[offset].x());
             float g = intensityValues[offset].y() / (1.0 + intensityValues[offset].y());
             float b = intensityValues[offset].z() / (1.0 + intensityValues[offset].z());
