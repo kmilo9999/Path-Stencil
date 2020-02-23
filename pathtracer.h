@@ -26,10 +26,11 @@ private:
                              const Eigen::Vector3f& hitPos, const Eigen::Vector3f& hitNormal,
                              Eigen::Vector3f hitColor);
 
-    Eigen::Vector3f uniformHemiSphere(float x, float y) ;
+    Eigen::Vector3f uniformHemiSphere(const Eigen::Vector3f& normal,float x, float y) ;
     void createNormalPlane(const Eigen::Vector3f & v1, Eigen::Vector3f & v2,Eigen::Vector3f & v3);
     std::vector<const Triangle*> triangleLigthSources;
-
+    Eigen::Vector3f getBRDF(const Eigen::Vector3f& rayDir, const Eigen::Vector3f& normal,
+                            const tinyobj::material_t& mat);
 
 };
 
