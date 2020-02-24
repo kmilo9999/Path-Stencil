@@ -45,23 +45,19 @@ void PathTracer::setLightSources(const Scene &scene)
 
 void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
 {
+    using namespace std::chrono;
+    auto start = high_resolution_clock::now();
+
     std::vector<Vector3f> intensityValues(m_width * m_height);
     setLightSources(scene);
     Matrix4f invViewMat = (scene.getCamera().getScaleMatrix() * scene.getCamera().getViewMatrix()).inverse();
     for(int y =0; y < m_height; ++y) {
-        //#pragma omp parallel for
-        //std::cout << y << std::endl;
+        #pragma omp parallel for
         for(int x = 0 ; x < m_width; ++x) {
             int offset = x + (y * m_width);
-            int samples = 100;
+            int samples = 5000;
             for (int rays=0; rays<samples; ++rays)
             {
-                // intensityValues[offset] = tracePixel(x, y, scene, invViewMat);
-
-                 //intensityValues[offset] = Vector3f(0.0,0.0,0.0);
-
-                  //   intensityValues[offset] += tracePixel(188, 203, scene, invViewMat)/samples;
-                     //  intensityValues[offset] += tracePixel(75, 143, scene, invViewMat)/samples;
                   intensityValues[offset] += tracePixel(x, y, scene, invViewMat) ;
             }
 
@@ -72,6 +68,11 @@ void PathTracer::traceScene(QRgb *imageData, const Scene& scene)
     }
 
     toneMap(imageData, intensityValues);
+
+    auto stop = high_resolution_clock::now();
+    auto duration = duration_cast<std::chrono::minutes>(stop - start);
+    std::cout << "Time taken by function: "
+            << duration.count() << " minutes" << std::endl;
 }
 
 Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f &invViewMatrix)
@@ -195,23 +196,9 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
             }
             else if(refrct)
             {
-
-                Vector3f refractVector = doRefract(currentDir, hitNormal, mat.ior);
-                float fresnelIndex = doFresnel(currentDir, hitNormal, mat.ior);
-                Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2.0;
-                if (myrand.x() > fresnelIndex)
-                {
-                  Vector3f lr = traceRay(Ray(px, refractVector), scene, 0);
-                  lr /= pdf_rr;
-                  L += lr;
-                }
-                else
-                {
-                   Vector3f reflectVector = r.d - 2.0 * (r.d.dot(hitNormal)) * hitNormal;
-                   Vector3f lr = traceRay(Ray(px, reflectVector), scene, 0);
-                   lr /= pdf_rr;
-                   L += lr;
-                }
+               Vector3f lr = Refraction(currentDir, hitNormal,px, mat.ior,scene);
+               lr /= pdf_rr;
+                L += lr;
             }
             else
             {
@@ -328,7 +315,7 @@ Vector3f PathTracer::directLight(const Scene& scene,
 
           Vector3f accum(0.0,0.0,0.0);
 
-          int samples = 1;
+          int samples = 5;
           for(int j = 0 ; j < samples; j++)
           {
                Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2;
@@ -375,6 +362,25 @@ Vector3f PathTracer::directLight(const Scene& scene,
 
 }
 
+Vector3f PathTracer::Refraction(const Vector3f& w, const Vector3f& n,
+                                const Vector3f& hitPos, float indexRfl, const Scene& scene)
+{
+
+    Vector3f refractVector = doRefract(w, n, indexRfl);
+    float fresnelIndex = doFresnel(w, n, indexRfl);
+    Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2.0;
+    if (myrand.x() > fresnelIndex)
+    {
+      return traceRay(Ray(hitPos, refractVector), scene, 0);
+
+    }
+    else
+    {
+       Vector3f reflectVector = w - 2.0 * (w.dot(n)) * n;
+       return traceRay(Ray(hitPos, reflectVector), scene, 0);
+    }
+}
+
 Vector3f PathTracer::doRefract(const Vector3f& w, const Vector3f& hitNormal, float indexRfl)
 {
      Vector3f normal( hitNormal);
@@ -413,7 +419,7 @@ float PathTracer::doFresnel(const Vector3f& w, const Vector3f& hitNormal, float 
     }
 
     float vI = powf((ni - nt) / (ni + nt), 2);
-    float VO = vI + (1.0 - VO) * powf(1.0 - cosThetai, 5);
+    float VO = vI + (1.0 - vI) * powf(1.0 - cosThetai, 5);
     return VO;
 }
 

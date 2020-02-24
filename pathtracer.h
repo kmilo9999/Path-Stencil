@@ -31,9 +31,14 @@ private:
     Eigen::Vector3f getBRDF(const Eigen::Vector3f& nRayDir,Eigen::Vector3f& oldRayDir, const Eigen::Vector3f& normal,
                             const tinyobj::material_t& mat);
 
+    // Refraction
+    Eigen::Vector3f Refraction(const Eigen::Vector3f& w, const Eigen::Vector3f& n,
+                               const Eigen::Vector3f& hitPos,float indexRfl, const Scene& scene);
+
     Eigen::Vector3f doRefract(const Eigen::Vector3f& w, const Eigen::Vector3f& n, float indexRfl);
     float doFresnel(const Eigen::Vector3f& w, const Eigen::Vector3f& n, float indexRfl);
 
+    //Mirror
     Eigen::Vector3f doMirror(const Eigen::Vector3f& w, const Eigen::Vector3f& n ,const Eigen::Vector3f& hitPos,const Scene& scene);
 
      float emmisionMultiplier;
