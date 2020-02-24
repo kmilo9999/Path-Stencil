@@ -83,8 +83,10 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
        // view port space
 
        Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2;
-       Vector3f d(((2.f * (x+ myrand.x()) / m_width) - 1),
-                       (1 - (2.f * (y+ myrand.y()) / m_height)), -1);
+       float offsetX = 0.5 - myrand.x();
+       float offsetY = 0.5 - myrand.y();
+       Vector3f d(((2.f * (x+ offsetX) / m_width) - 1),
+                       (1 - (2.f * (y+ offsetY) / m_height)), -1);
 
        d.normalize();
 
@@ -99,7 +101,7 @@ Vector3f PathTracer::tracePixel(int x, int y, const Scene& scene, const Matrix4f
 
 }
 
-Eigen::Vector3f PathTracer::getBRDF(const Vector3f& rayDir,  Vector3f& oldRayDir,
+Eigen::Vector3f PathTracer::getBRDF(const Vector3f& wi,  Vector3f& wo,
                                     const Vector3f& normal,const tinyobj::material_t& mat)
 {
 
@@ -109,13 +111,22 @@ Eigen::Vector3f PathTracer::getBRDF(const Vector3f& rayDir,  Vector3f& oldRayDir
     const tinyobj::real_t *s = mat.specular;//specular color as array of floats
     Vector3f specularV(s[0],s[1],s[2]);
 
-    const tinyobj::real_t shininnes = 100;//mat.shininess;
+    const tinyobj::real_t shininnes = mat.shininess;
 
-   if(specularV !=  Vector3f::Zero())
+   if(specularV.norm() > 0.0)
    {
-       Vector3f reflectV = rayDir - 2.0 * (rayDir.dot(normal)) * normal;
-       float reflectShininnes = pow(reflectV.dot(oldRayDir), shininnes);
-       return specularV * ((shininnes + 2) / (2 * M_PI)) * reflectShininnes;
+       Vector3f reflectV(0.0,0.0,0.0);
+       if(wi.dot(normal) < 0)
+       {
+         reflectV = wi - 2.0 * (wi.dot(normal)) * normal;
+       }else
+       {
+         reflectV = ((2 * wi.dot(normal) * normal) - wi);
+       }
+       reflectV = reflectV.normalized();
+       float n = ((shininnes + 2) / (2 * M_PI));
+       float reflectShininnes = pow(reflectV.dot(wo), shininnes);
+       return specularV * n * reflectShininnes;
    }
    else
    {
@@ -157,7 +168,9 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
 
         Vector3f px = interesction.hit;
 
-        Vector3f currentDir = ray.d;
+        // I dont trust r.d anymore !!
+        Vector3f currentDir(ray.d);
+
         const Vector3f hitNormal =  t->getNormal(px).normalized();
 
         Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2.0;
@@ -171,18 +184,37 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
 
         Vector2f random = (Vector2f::Random () + Vector2f::Ones())/2.0;
 
-        float pdf_rr =0.75;
+        float pdf_rr =0.9;
         if(random.x() < pdf_rr)
         {
-            /*if (isMirror)
+            if (isMirror)
             {
-              Vector3f reflectVector = currentDir - 2.0 * (currentDir.dot(hitNormal)) * hitNormal;
-              Vector3f lr = traceRay(Ray(px, reflectVector), scene, 0);
+             Vector3f lr = doMirror(currentDir,hitNormal,px,scene);
               Vector3f incoming = lr / pdf_rr;
               L += incoming;
-            }*/
-            //else
-           // {
+            }
+            else if(refrct)
+            {
+
+                Vector3f refractVector = doRefract(currentDir, hitNormal, mat.ior);
+                float fresnelIndex = doFresnel(currentDir, hitNormal, mat.ior);
+                Vector2f myrand = (Vector2f::Random () + Vector2f::Ones())/2.0;
+                if (myrand.x() > fresnelIndex)
+                {
+                  Vector3f lr = traceRay(Ray(px, refractVector), scene, 0);
+                  lr /= pdf_rr;
+                  L += lr;
+                }
+                else
+                {
+                   Vector3f reflectVector = r.d - 2.0 * (r.d.dot(hitNormal)) * hitNormal;
+                   Vector3f lr = traceRay(Ray(px, reflectVector), scene, 0);
+                   lr /= pdf_rr;
+                   L += lr;
+                }
+            }
+            else
+            {
                float costheta = newDir.dot(hitNormal);
                float pdf = 1.0 / (2.0 * M_PI);
 
@@ -191,7 +223,7 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
                Vector3f color = (lr.array()   * brdf.array());
                Vector3f incoming  = color    * costheta/ (pdf * pdf_rr) ;
                L +=  incoming  ;
-           // }
+            }
 
         }
 
@@ -207,6 +239,11 @@ Vector3f PathTracer::traceRay(const Ray& r, const Scene& scene, int bounce )
     }
 }
 
+Vector3f PathTracer::doMirror(const Vector3f& w, const Vector3f& n , const Vector3f& hitPos,const Scene& scene)
+{
+    Vector3f reflectVector = w - 2.0 * (w.dot(n)) * n;
+    return traceRay(Ray(hitPos, reflectVector), scene, 0);
+}
 
 void PathTracer::createNormalPlane(const Vector3f & normal, Vector3f & v2,Vector3f & v3)
 {
@@ -302,7 +339,7 @@ Vector3f PathTracer::directLight(const Scene& scene,
                                          + (sqrt(r1) * (1 - r2)) * v2
                                          + (r2 * sqrt(r1)) * v3;
 
-               Vector3f normalV = t->getNormal(lightPosition).normalized();
+
 
                Vector3f lightDir = (hitPos -lightPosition).normalized() ;
                Vector3f lightDirPrime = (lightPosition - hitPos).normalized();
@@ -313,6 +350,8 @@ Vector3f PathTracer::directLight(const Scene& scene,
                        && (interesction.hit - lightPosition).norm() < 0.001)
                {
 
+                 Vector3f ligthHitPos =interesction.hit;
+                 Vector3f normalV = t->getNormal(ligthHitPos).normalized();
                  float dis = (hitPos -lightPosition).norm();
 
                  float costheta = std::fmax(0.0,lightDirPrime.dot(hitNormal));
@@ -336,19 +375,60 @@ Vector3f PathTracer::directLight(const Scene& scene,
 
 }
 
+Vector3f PathTracer::doRefract(const Vector3f& w, const Vector3f& hitNormal, float indexRfl)
+{
+     Vector3f normal( hitNormal);
+     float cosThetai = w.dot(hitNormal);
+
+     float index =0.0;
+     if (cosThetai < 0)
+     {
+          index = 1 / indexRfl;
+          cosThetai *= -1;
+     }
+     else
+     {
+        index = indexRfl;
+        normal *= -1;
+     }
+     float cosThetat = sqrtf(1.0 - index * index * (1.0 - cosThetai * cosThetai));
+     Vector3f refractVector = index * w + (index * cosThetai - cosThetat) * normal;
+     return refractVector.normalized();
+
+}
+
+float PathTracer::doFresnel(const Vector3f& w, const Vector3f& hitNormal, float indexRfl)
+{
+    float ni = 1;
+    float nt = indexRfl;
+    float cosThetai = w.dot(hitNormal);
+    if (cosThetai < 0)
+    {
+         cosThetai = -cosThetai;
+    }
+    else
+    {
+         ni = indexRfl;
+         nt = 1;
+    }
+
+    float vI = powf((ni - nt) / (ni + nt), 2);
+    float VO = vI + (1.0 - VO) * powf(1.0 - cosThetai, 5);
+    return VO;
+}
+
 void PathTracer::toneMap(QRgb *imageData, std::vector<Vector3f> &intensityValues) {
     for(int y = 0; y < m_height; ++y) {
         for(int x = 0; x < m_width; ++x) {
             int offset = x + (y * m_width);
             Vector3f currentIntensity = intensityValues[offset];
+            /*qRgb tonedColr(intensityValues[offset].x() / (1.0 + intensityValues[offset].x()) *255.0,
+                           intensityValues[offset].y() / (1.0 + intensityValues[offset].y())*255.0,
+                           intensityValues[offset].z() / (1.0 + intensityValues[offset].z())*255.0)*/
 
-            float r = intensityValues[offset].x() / (1.0 + intensityValues[offset].x());
-            float g = intensityValues[offset].y() / (1.0 + intensityValues[offset].y());
-            float b = intensityValues[offset].z() / (1.0 + intensityValues[offset].z());
-
-            imageData[offset] = qRgb(r *255.0,
-                                                 g*255.0,
-                                                 b*255.0);
+            imageData[offset] = qRgb(intensityValues[offset].x() / (1.0 + intensityValues[offset].x()) *255.0,
+                                     intensityValues[offset].y() / (1.0 + intensityValues[offset].y())*255.0,
+                                     intensityValues[offset].z() / (1.0 + intensityValues[offset].z())*255.0);
         }
     }
 
